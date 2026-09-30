@@ -31,12 +31,18 @@ DUT-Ujing/
 │       ├── dashboard.tsx   #   主面板
 │       └── device-card.tsx #   设备状态卡片
 └── app/                    # App 版（Expo React Native，复刻 Web 功能）
+    ├── plugins/            #   Expo 配置插件（release 签名 + 权限裁剪）
+    ├── keys/               #   Android 签名密钥（个人项目随仓库分发）
     ├── App.tsx
     └── src/
         ├── lib/ujing.ts    #   U净 API 客户端（RN 直连，无 CORS 限制）
         ├── lib/storage.ts  #   AsyncStorage 会话与设备存储
         └── screens/        #   登录 / 主面板 / 扫码
 ```
+
+## 📲 直接下载 APK
+
+到 [Releases](https://github.com/43aquarius/DUT-Ujing/releases) 页面下载最新的 `DUT-Ujing-vX.X.X.apk`，手机上直接安装（需允许“安装未知来源应用”）。APK 由 GitHub Actions 自动构建并签名，每次打 `v*` tag 会自动发布新版本。
 
 ## Web 版运行
 
@@ -63,7 +69,12 @@ npx expo start            # 手机装 Expo Go 扫码即可体验
 
 App 直连 U净 接口（RN 无 CORS 限制），数据全部保存在本机。
 
-> 打正式包：`npx eas build -p android`（需 Expo 账号），或本地 `npx expo run:android`。
+### 打包 Android APK
+
+- **CI 自动打包（推荐）**：推送 `v*` tag（如 `git tag v1.0.1 && git push origin v1.0.1`），GitHub Actions 自动构建 release APK 并发布到 [Releases](https://github.com/43aquarius/DUT-Ujing/releases)；也可在 Actions 页手动触发（产物在 Artifacts）。
+- **本地打包**：`cd app && npx expo prebuild -p android && cd android && ./gradlew assembleRelease`，产物在 `android/app/build/outputs/apk/release/`，用仓库内 `keys/release.keystore`（alias `ujing`）签名。
+
+签名说明：本项目为个人使用，签名密钥 `app/keys/release.keystore` 随仓库分发（口令见 `app/plugins/withReleaseSigning.js`），保证后续版本可覆盖安装；公开分发请自行更换密钥。
 
 ## U净 API 协议（速览）
 

@@ -1,0 +1,118 @@
+name: Build Android APK
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Release APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('app/package.json') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Install JS dependencies
+        working-directory: app
+        run: bun install --frozen-lockfile
+
+      - name: Expo prebuild (generate android project)
+        working-directory: app
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Show injected signing config
+        run: |
+          echo "--- android/app/build.gradle 尾部 ---"
+          tail -30 app/android/app/build.gradle
+
+      - name: Ensure Android SDK platforms
+        run: |
+          SDKMGR="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          [ -x "$SDKMGR" ] || SDKMGR="$(command -v sdkmanager)"
+          echo "Using sdkmanager: $SDKMGR"
+          yes | "$SDKMGR" --licenses >/dev/null 2>&1 || true
+          "$SDKMGR" --install "platforms;android-36" "platforms;android-35" >/dev/null 2>&1 || true
+
+      - name: Build release APK
+        working-directory: app/android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g"
+
+      - name: Compute version name
+        id: ver
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=dev-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Collect APK
+        run: |
+          mkdir -p dist
+          cp app/android/app/build/outputs/apk/release/app-release.apk \
+             "dist/DUT-Ujing-${{ steps.ver.outputs.name }}.apk"
+          cd dist && sha256sum *.apk > sha256.txt && cd ..
+          ls -la dist/
+          echo "APK_SIZE=$(du -h dist/*.apk | cut -f1)" >> "$GITHUB_ENV"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DUT-Ujing-${{ steps.ver.outputs.name }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.apk
+            dist/sha256.txt
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          body: |
+            ## U净洗衣机助手 ${{ steps.ver.outputs.name }}
+
+            扫码收藏 U净 共享洗衣机，随时查看占用状态（Android 原生 App）。
+
+            ### 安装方法
+            1. 下载下方 `DUT-Ujing-*.apk`（大小约 ${{ env.APK_SIZE }}）
+            2. 在手机上点击安装，允许「安装未知来源应用」
+            3. 使用 U净 App 注册的手机号 + 短信验证码登录
+            4. 对准洗衣机机身二维码扫码，即可收藏并随时查看是否空闲
+
+            ### 系统要求
+            - Android 8.0（API 26）及以上
+            - 需要相机权限（扫码）
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

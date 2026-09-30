@@ -73,6 +73,11 @@ async function request<T>(
       url.searchParams.set(k, String(v));
     }
   }
+  // 兜底：带 body 的 POST 若未声明 Content-Type，RN fetch 会自动置为
+  // text/plain;charset=UTF-8，U净网关会以 CODEC 400 拒绝（登录失败报错根因）
+  if (opts.body !== undefined && !Object.keys(headers).some((k) => k.toLowerCase() === "content-type")) {
+    headers = { ...headers, "Content-Type": "application/json" };
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 15000);
   let res: Response;
@@ -94,10 +99,12 @@ async function request<T>(
     throw new UjingApiError(res.status, `U净服务返回了无法解析的响应 (HTTP ${res.status})`);
   }
   if (json.code !== 0) {
-    throw new UjingApiError(
-      json.code,
-      json.message || json.msg || `U净接口错误 (code=${json.code})`
-    );
+    // 网关 CODEC 错误的 message 是 content-type 字符串，对用户不可读，转译
+    let message = json.message || json.msg || `U净接口错误 (code=${json.code})`;
+    if (json.code === 400 || /charset=/i.test(message)) {
+      message = "U净网关拒绝了请求格式，请稍后重试或更新应用";
+    }
+    throw new UjingApiError(json.code, message);
   }
   return json;
 }
