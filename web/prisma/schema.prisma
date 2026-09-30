@@ -1,0 +1,39 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// U净用户（以手机号为唯一标识，首次登录自动创建）
+model User {
+  id        String   @id @default(cuid())
+  mobile    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  devices   Device[]
+}
+
+// 已保存的洗衣机（扫码添加）
+model Device {
+  id             String    @id @default(cuid())
+  userMobile     String
+  user           User      @relation(fields: [userMobile], references: [mobile], onDelete: Cascade)
+  name           String // 用户备注名，如 "3楼右滚筒"
+  qrCode         String // 二维码原文
+  deviceId       String? // U净平台设备ID（首次查询成功后回填）
+  deviceNo       String? // 设备编号
+  storeName      String? // 所在洗衣房/门店名
+  deviceTypeName String? // 设备类型（滚筒/波轮/烘干机等）
+  macAddress     String? // 蓝牙 MAC
+  lastStatus     String? @default("unknown") // free | busy | offline | unknown
+  lastReason     String? // 最近一次查询返回的原因说明
+  lastCheckedAt  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([userMobile])
+  @@unique([userMobile, qrCode])
+}
