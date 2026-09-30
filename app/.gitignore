@@ -1,12 +1,11 @@
-node_modules/
-.expo/
-dist/
-*.log
+*.iml
+.gradle/
+local.properties
+.idea/
 .DS_Store
-*.tsbuildinfo
-
-# CI/本地 prebuild 生成的原生工程（由 GitHub Actions 构建时重新生成）
-/android
-/ios
-
-# 注意：keys/release.keystore 需要提交（CI 签名用，个人项目随仓库分发）
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+.kotlin/
+local.properties

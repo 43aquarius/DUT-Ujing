@@ -109,16 +109,92 @@ Body: {"qrCode": "<二维码原文>"}
   "online": 1,
   "createOrderEnabled": true,
   "reason": "",
-  "status": ""
+  "status": "",
+  "orderId": 0,
+  "moduleType": 1,
+  "mobile": "",
+  "isSlotMachine": false
 }
 ```
 
 | 字段 | 说明 |
 |------|------|
-| `createOrderEnabled` | **true = 空闲可用；false = 占用中**（本项目判定占用的核心依据）|
-| `reason` | 不可下单原因（占用时返回，如"设备使用中"）|
+| `createOrderEnabled` | **true = 空闲可用；false = 当前不可下单**（本项目判定占用的核心依据）|
+| `reason` | 不可下单原因（服务端人话文案，如「设备使用中」等，v2 起直接展示给用户）|
+| `orderId` | 设备当前订单号（占用中且可拿到时 > 0，可查订单详情获取剩余时间；他人订单可能被服务端拒绝，需降级处理）|
+| `status` | 设备/订单状态码（数值型，见订单状态枚举）|
 | `deviceId` | 平台设备 ObjectId（注意：BLE 上报时也必须用它，填 MAC 会报 1603）|
 | `online` | 0 离线 / 1 在线 |
+
+> **重要（v2.0 结论）**：当设备处于非营业时间等场景时，服务端可能在 envelope 层直接返回
+> `code != 0` + `message`（人话提示），而不是返回 `createOrderEnabled=false`。
+> 客户端必须把 `message` 原样透出，否则用户只能看到无意义的「查询失败」。
+
+
+## 订单与更多字段研究（v2.0 新增）
+
+### 我正在进行的订单
+
+```
+GET /api/v1/orders/running        Header: BA + Bearer token
+→ data 直接是订单数组（liteU/UjingClient.swift 实测）
+```
+
+数组元素字段：`orderId`、`deviceId`、`deviceTypeId`、`deviceTypeName`、`deviceNo`、`storeName`、
+`status`、`isPauseStatus`、`createAt`（ISO 8601）、`remainTime`（秒）。
+用于给「自己正在洗的那台」显示权威剩余时间。
+
+### 订单详情（含剩余时间）
+
+```
+GET /api/v1/orders/{orderId}/detail?additional=price
+→ data 为订单对象
+```
+
+关键字段（ujing-mini 实机验证的完整响应）：
+
+| 字段 | 说明 |
+|------|------|
+| `status` | 订单状态码（见下表；数值或字符串形态均出现过，解析需宽容）|
+| `statusRemark` | 状态人话文案，如「运行中」|
+| `remainTime` | **剩余秒数**（仅 `status` 为 30/40 且未暂停时 > 0，其余阶段为 0）|
+| `workTime` | 整套模式时长（分钟）|
+| `cycle` | 模式周期名，如「普通洗 \| 筒自洁」|
+| `createAt` / `userClickWashStartTime` / `washStartTime` | UTC ISO-8601 时间戳；remainTime 为 0 时可用它们 + workTime 倒推 |
+| `payFlag` / `payPrice` | 支付状态与金额（如 1 / 2.78）|
+| `deviceNo` / `storeName` / `macAddress` / `moduleType` / `online` | 设备信息 |
+
+**订单状态完整枚举**（ujing-mini 实机验证 + liteU 文档交叉确认）：
+
+```
+10=已预约  17=支付中  20=已支付  21=启动中  22=筒自洁启动中  24=投放洗涤剂中
+29=订单保护中  30=筒自洁中  35=筒自洁完成  40=运行中  50=已完成
+51=支付超时  52=启动失败  53=已取消  54=超时未启动  60/61=故障中
+isPauseStatus=true → 机器暂停中（不倒计时）
+```
+
+> 倒计时规则（liteU 实测）：仅 `status` 为 30/40、未暂停且 `remainTime > 0` 时：
+> 结束时刻 = 拉取时刻 + `remainTime`。
+
+### 设备程序详情（program/info）更多字段
+
+`data.deviceWashModel[]` 为价目表：`workModelId` / `workModelName` / `basePrice`（分）/
+`promotionPrice`（分；无促销时服务端返 0，须判 >0 才采信）/ `time`（分钟）/ `isDefault` / `tags[]`。
+另有 `warmTip`（温馨提示文案）、`storeMobile`（门店客服电话）、`serviceSubjectName`（运营主体）。
+注意 `isPromotion` / `isDefault` / `hide` 服务端返回 0/1 数字而非布尔，解析需宽容处理。
+
+### 门店级查询（整间洗衣房空闲概览）
+
+```
+GET /api/v1/stores/near?lat=&lont=&scope=2000&page=1&size=100&mode=BA&keyword={楼栋名}
+Header: x-app-code: ZA, x-app-version: 2.4.18 + Bearer token
+→ data.storeList[]，其中 storeInfo[] 含 category==1（洗衣机）的 num（总数）/ access（空闲数）
+
+GET /api/v1/devices/reserve?storeId={storeId}        Header 同上
+→ data.devices[].device = { deviceTypeName, free, total, waitTime(分钟) }
+```
+
+来源：Huoyuuu/ujing-laundry（DUT 校内实测）。可用于「本洗衣房还剩几台空闲」。
 
 ## 其他接口（本项目备而未用）
 

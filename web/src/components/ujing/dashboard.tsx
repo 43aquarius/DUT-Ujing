@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ScanDialog } from "./scan-dialog";
-import { DeviceCard, DeviceLiveState } from "./device-card";
+import { DeviceCard, DeviceLiveState, type LiveStatus } from "./device-card";
 import type { SavedDevice, ScanResult } from "@/lib/types";
 
 interface DashboardProps {
@@ -96,6 +96,12 @@ export function Dashboard({ mobile, token, onLogout, onTokenExpired }: Dashboard
         });
         const json = (await res.json()) as {
           result?: ScanResult;
+          order?: {
+            status?: number;
+            statusRemark?: string | null;
+            remainTime?: number | null;
+            workTime?: number | null;
+          } | null;
           error?: string;
           code?: number;
         };
@@ -105,10 +111,22 @@ export function Dashboard({ mobile, token, onLogout, onTokenExpired }: Dashboard
         }
         if (!res.ok || !json.result) throw new Error(json.error || "查询失败");
         const r = json.result;
+        const order = json.order ?? null;
+        // 仅 30(自洁)/40(运行) 且 remainTime>0 时倒计时（liteU 实测结论）
+        const counting =
+          order != null &&
+          (order.status === 30 || order.status === 40) &&
+          (order.remainTime ?? 0) > 0;
         const status: LiveStatus = r.createOrderEnabled === true ? "free" : "busy";
         setLiveMap((m) => ({
           ...m,
-          [device.id]: { status, reason: r.reason ?? null, checkedAt: new Date() },
+          [device.id]: {
+            status,
+            reason: r.reason ?? order?.statusRemark ?? null,
+            checkedAt: new Date(),
+            remainSec: counting ? order!.remainTime! : null,
+            endAt: counting ? Date.now() + order!.remainTime! * 1000 : null,
+          },
         }));
         // 后台回填设备信息
         void fetch(`/api/devices/${device.id}`, {

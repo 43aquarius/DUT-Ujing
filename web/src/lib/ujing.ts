@@ -239,3 +239,35 @@ export function isUjingQrCode(text: string): boolean {
     /^https?:\/\/app\.littleswan\.com\/u_download\.html\?/i.test(t)
   );
 }
+
+export interface OrderDetail {
+  orderId?: string | number;
+  status?: number | string;
+  statusRemark?: string;
+  remainTime?: number | string; // 秒
+  workTime?: number | string;   // 分钟
+  deviceNo?: string;
+  storeName?: string;
+  [k: string]: unknown;
+}
+
+/**
+ * 订单详情（status / statusRemark / remainTime 秒 / workTime 分钟）。
+ * 扫占用中的机器拿到的 orderId 可能属于他人，服务端可能拒绝 → 返回 null 降级。
+ */
+export async function orderDetail(
+  token: string,
+  orderId: string | number
+): Promise<OrderDetail | null> {
+  try {
+    const json = await request<OrderDetail>(
+      "GET",
+      `/api/v1/orders/${orderId}/detail`,
+      businessHeaders(token),
+      { query: { additional: "price" } }
+    );
+    return (json.data ?? null) as OrderDetail | null;
+  } catch {
+    return null; // 尽力而为，失败不影响主状态
+  }
+}

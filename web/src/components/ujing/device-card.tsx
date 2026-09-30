@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,10 @@ export interface DeviceLiveState {
   reason?: string | null;
   checkedAt?: Date;
   error?: string;
+  /** checkedAt 时刻的剩余秒数（订单 status 30/40 时有效） */
+  remainSec?: number | null;
+  /** 预计结束时刻 epoch ms */
+  endAt?: number | null;
 }
 
 interface DeviceCardProps {
@@ -53,10 +57,22 @@ function timeAgo(d?: Date | string | null): string {
   return `${Math.floor(diff / 86400)} 天前`;
 }
 
+function fmtCountdown(sec: number): string {
+  const s = Math.max(0, Math.floor(sec));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
 /** 单台洗衣机的状态卡片 */
 export function DeviceCard({ device, live, onRefresh, onRename, onDelete }: DeviceCardProps) {
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(device.name);
+  // 有倒计时时每秒重绘
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!live?.endAt) return;
+    const t = setInterval(() => tick((x) => x + 1), 1000);
+    return () => clearInterval(t);
+  }, [live?.endAt]);
 
   const status: LiveStatus = live?.status ?? "unknown";
   const isChecking = status === "checking";
@@ -190,7 +206,7 @@ export function DeviceCard({ device, live, onRefresh, onRename, onDelete }: Devi
           </div>
         </div>
 
-        {/* 占用原因 / 错误信息 / 时间 */}
+        {/* 占用原因 / 错误信息 / 剩余时间 / 时间 */}
         <div className="mt-3 flex items-center justify-between gap-2 text-xs">
           <div className="min-w-0">
             {status === "busy" && live?.reason && (
@@ -214,6 +230,23 @@ export function DeviceCard({ device, live, onRefresh, onRename, onDelete }: Devi
             更新于 {timeAgo(live?.checkedAt ?? device.lastCheckedAt)}
           </span>
         </div>
+
+        {/* 剩余时间倒计时（订单 remainTime，占用中且可拿到时显示） */}
+        {status === "busy" && (live?.endAt ?? 0) > Date.now() && (
+          <div className="mt-2 text-sm font-semibold text-red-600 dark:text-red-400">
+            ⏳ 剩余 {fmtCountdown((live!.endAt! - Date.now()) / 1000)} · 预计{" "}
+            {new Date(live!.endAt!).toLocaleTimeString("zh-CN", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}{" "}
+            洗完
+          </div>
+        )}
+        {status === "busy" && live?.endAt && live.endAt <= Date.now() && (
+          <div className="mt-2 text-sm font-semibold text-red-600 dark:text-red-400">
+            可能已洗完，刷新看看
+          </div>
+        )}
 
         {device.deviceId && (
           <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground">
