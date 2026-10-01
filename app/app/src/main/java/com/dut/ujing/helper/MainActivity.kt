@@ -68,7 +68,7 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     companion object {
-        const val REPO_URL = "https://github.com/43aquaris/DUT-Ujing"
+        const val REPO_URL = "https://github.com/43aquarius/DUT-Ujing"
 
         fun start(ctx: android.content.Context, clearStack: Boolean = false) {
             val intent = Intent(ctx, MainActivity::class.java)

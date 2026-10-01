@@ -535,7 +535,7 @@ export function Dashboard({ mobile, token, onLogout, onTokenExpired }: Dashboard
               asChild
             >
               <a
-                href="https://github.com/43aquaris/DUT-Ujing"
+                href="https://github.com/43aquarius/DUT-Ujing"
                 target="_blank"
                 rel="noreferrer"
                 aria-label="GitHub 仓库"
