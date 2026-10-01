@@ -35,6 +35,7 @@ import {
   Upload,
   ClipboardList,
   Timer,
+  Github,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ScanDialog } from "./scan-dialog";
@@ -527,6 +528,22 @@ export function Dashboard({ mobile, token, onLogout, onTokenExpired }: Dashboard
           </div>
 
           <div className="flex items-center gap-1.5">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              asChild
+            >
+              <a
+                href="https://github.com/43aquaris/DUT-Ujing"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="GitHub 仓库"
+                title="GitHub 仓库"
+              >
+                <Github className="w-4 h-4" />
+              </a>
+            </Button>
             <Button
               size="sm"
               variant="outline"

@@ -68,6 +68,8 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     companion object {
+        const val REPO_URL = "https://github.com/43aquaris/DUT-Ujing"
+
         fun start(ctx: android.content.Context, clearStack: Boolean = false) {
             val intent = Intent(ctx, MainActivity::class.java)
             if (clearStack) intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -157,6 +159,7 @@ class MainActivity : AppCompatActivity() {
         b.btnEmptyAdd.setOnClickListener { launchScanner() }
         b.btnManual.setOnClickListener { showManualAddDialog() }
         b.btnLogout.setOnClickListener { confirmLogout() }
+        b.btnGithub.setOnClickListener { openRepo() }
 
         // v2.1 工具栏
         b.btnFreeOnly.setOnClickListener {
@@ -989,6 +992,17 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    // ------------------------------------------------------------ 外部入口
+
+    /** 打开 GitHub 仓库页（无浏览器时降级为 toast 提示地址） */
+    private fun openRepo() {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(REPO_URL)))
+        } catch (e: Exception) {
+            toast("无法打开浏览器：$REPO_URL")
+        }
     }
 
     private fun confirmLogout() {
