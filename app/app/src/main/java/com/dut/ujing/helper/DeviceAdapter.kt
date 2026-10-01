@@ -11,6 +11,7 @@ import com.dut.ujing.helper.databinding.ItemDeviceBinding
 import com.dut.ujing.helper.ujing.DeviceTypes
 import com.dut.ujing.helper.ujing.SavedDevice
 import com.dut.ujing.helper.ujing.UiStatus
+import com.dut.ujing.helper.ujing.displayName
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -50,15 +51,17 @@ class DeviceAdapter(
 
         fun bind(d: SavedDevice) {
             bound = d
-            b.tvName.text = d.name
+            // v2.1：大字 = 友好别名（「西山1舍-5层 #3」），用户自定义名优先
+            val shown = d.displayName()
+            b.tvName.text = shown
 
-            // 元信息：门店 · 机号 · 机型
-            val meta = listOfNotNull(
-                d.storeName?.takeIf { it.isNotBlank() },
-                d.deviceNo?.takeIf { it.isNotBlank() }?.let { "#$it" },
-                DeviceTypes.name(d.deviceTypeId),
-            ).filter { it.isNotBlank() }.joinToString(" · ")
-            b.tvMeta.text = meta.ifBlank { d.qrCode.takeLast(18) }
+            // 小字：机型 · 门店（大字未包含时）· 机身码尾号（编号）
+            val storeInName = shown.contains(d.storeName.orEmpty()) && !d.storeName.isNullOrBlank()
+            val meta = mutableListOf<String>()
+            DeviceTypes.name(d.deviceTypeId)?.let { meta.add(it) }
+            if (!storeInName) d.storeName?.takeIf { it.isNotBlank() }?.let { meta.add(it) }
+            meta.add("机身码 ${d.qrCode.takeLast(6)}")
+            b.tvMeta.text = meta.joinToString(" · ")
 
             applyStatus(d)
             b.tvTime.text = "更新于 ${timeAgo(d.lastCheckedAt)}"

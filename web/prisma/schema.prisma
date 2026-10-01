@@ -21,11 +21,12 @@ model Device {
   id             String    @id @default(cuid())
   userMobile     String
   user           User      @relation(fields: [userMobile], references: [mobile], onDelete: Cascade)
-  name           String // 用户备注名，如 "3楼右滚筒"
+  name           String // 用户备注名（自动友好名或自定义名）
+  customName     Boolean   @default(false) // true = 用户手动改过名，不再自动升级
   qrCode         String // 二维码原文
   deviceId       String? // U净平台设备ID（首次查询成功后回填）
-  deviceNo       String? // 设备编号
-  storeName      String? // 所在洗衣房/门店名
+  deviceNo       String? // 设备编号（机身机号，如 3）
+  storeName      String? // 所在洗衣房/门店名（如 西山1舍-5层）
   deviceTypeName String? // 设备类型（滚筒/波轮/烘干机等）
   macAddress     String? // 蓝牙 MAC
   lastStatus     String? @default("unknown") // free | busy | offline | unknown

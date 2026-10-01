@@ -25,6 +25,7 @@ import {
   Loader2,
 } from "lucide-react";
 import type { SavedDevice } from "@/lib/types";
+import { displayNameOf } from "@/lib/types";
 
 export type LiveStatus = "checking" | "free" | "busy" | "error" | "unknown";
 
@@ -117,6 +118,9 @@ export function DeviceCard({ device, live, onRefresh, onRename, onDelete }: Devi
     setEditing(false);
   };
 
+  // 编辑时预填备注名（大字可能是自动别名，改名基于备注名）
+  useEffect(() => setDraftName(device.name), [device.name]);
+
   return (
     <Card className={`transition-colors ${cfg.cls}`}>
       <CardContent className="p-4 sm:p-5">
@@ -146,24 +150,26 @@ export function DeviceCard({ device, live, onRefresh, onRename, onDelete }: Devi
             ) : (
               <div className="flex items-center gap-2 min-w-0">
                 <WashingMachine className="w-5 h-5 shrink-0 text-muted-foreground" />
-                <h3 className="font-semibold truncate">{device.name}</h3>
+                <h3 className="font-semibold truncate" title={device.name}>
+                  {displayNameOf(device)}
+                </h3>
               </div>
             )}
 
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              {device.storeName && (
+              {device.deviceTypeName && <span>{device.deviceTypeName}</span>}
+              {/* 大字是自动别名时门店/机号已含在大字里；自定义名时在小字补充 */}
+              {device.customName && device.storeName && (
                 <span className="inline-flex items-center gap-1">
                   <MapPin className="w-3 h-3" />
                   {device.storeName}
+                  {device.deviceNo ? ` #${device.deviceNo}` : ""}
                 </span>
               )}
-              {device.deviceNo && (
-                <span className="inline-flex items-center gap-1">
-                  <Hash className="w-3 h-3" />
-                  {device.deviceNo}
-                </span>
-              )}
-              {device.deviceTypeName && <span>{device.deviceTypeName}</span>}
+              <span className="inline-flex items-center gap-1">
+                <Hash className="w-3 h-3" />
+                机身码 {device.qrCode.slice(-6)}
+              </span>
             </div>
           </div>
 

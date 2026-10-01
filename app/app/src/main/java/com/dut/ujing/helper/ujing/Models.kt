@@ -56,6 +56,11 @@ data class ScanInfo(
     val deviceId: String?,
     val macAddress: String?,
     val deviceTypeId: Int?,
+    val deviceTypeName: String?,
+    val storeId: String?,
+    val storeName: String?,
+    val deviceNo: String?,
+    val online: Int?,
     val createOrderEnabled: Boolean?,
     val reason: String?,
     val status: Int?,
@@ -67,6 +72,11 @@ data class ScanInfo(
             deviceId = result.optStringOrNull("deviceId"),
             macAddress = result.optStringOrNull("macAddress"),
             deviceTypeId = result.optIntOrNull("deviceTypeId"),
+            deviceTypeName = result.optStringOrNull("deviceTypeName"),
+            storeId = result.optStringOrNull("storeId"),
+            storeName = result.optStringOrNull("storeName"),
+            deviceNo = result.optStringOrNull("deviceNo"),
+            online = result.optIntOrNull("online"),
             createOrderEnabled = result.optFlexibleBool("createOrderEnabled"),
             reason = result.optStringOrNull("reason"),
             status = result.optIntOrNull("status"),
@@ -76,16 +86,34 @@ data class ScanInfo(
     }
 }
 
+/**
+ * 友好显示名：「西山1舍-5层 #3」这种给人看的名字。
+ * 优先 门店名 + 机号；拿不到时返回 null（调用方自行降级到机身码尾号）。
+ */
+fun friendlyName(storeName: String?, deviceNo: String?, fallback: String? = null): String? {
+    val s = storeName?.trim()?.takeIf { it.isNotBlank() }
+    val n = deviceNo?.trim()?.takeIf { it.isNotBlank() }
+    return when {
+        s != null && n != null -> "$s #$n"
+        s != null -> s
+        n != null -> "机器 #$n"
+        else -> fallback
+    }
+}
+
 /** 订单信息（running 列表项 / detail 响应共用） */
 data class OrderBrief(
     val orderId: Long,
     val deviceId: String?,
     val deviceNo: String?,
     val deviceTypeId: Int?,
+    val deviceTypeName: String?,
+    val storeName: String?,
     val status: Int?,
     val statusRemark: String?,
     val remainTime: Int?,   // 秒
     val workTime: Int?,     // 分钟（整洗时长）
+    val isPauseStatus: Boolean?,
 ) {
     companion object {
         fun from(o: JSONObject) = OrderBrief(
@@ -93,10 +121,13 @@ data class OrderBrief(
             deviceId = o.optStringOrNull("deviceId"),
             deviceNo = o.optStringOrNull("deviceNo"),
             deviceTypeId = o.optIntOrNull("deviceTypeId"),
+            deviceTypeName = o.optStringOrNull("deviceTypeName"),
+            storeName = o.optStringOrNull("storeName"),
             status = o.optIntOrNull("status"),
             statusRemark = o.optStringOrNull("statusRemark"),
             remainTime = o.optIntOrNull("remainTime"),
             workTime = o.optIntOrNull("workTime"),
+            isPauseStatus = o.optFlexibleBool("isPauseStatus"),
         )
     }
 
@@ -104,6 +135,12 @@ data class OrderBrief(
     fun endAt(now: Long): Long? =
         if (remainTime != null && remainTime > 0 && OrderStatus.counting(status)) now + remainTime * 1000L
         else null
+
+    /** 该订单在 UI 上展示的名字（「我的订单」视图用） */
+    fun title(): String =
+        friendlyName(storeName, deviceNo)
+            ?: deviceTypeName?.takeIf { it.isNotBlank() }
+            ?: "订单 #$orderId"
 }
 
 /** 卡片 UI 状态 */

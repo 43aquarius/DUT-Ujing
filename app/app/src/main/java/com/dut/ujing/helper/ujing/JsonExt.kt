@@ -59,6 +59,16 @@ fun JSONObject.optFlexibleBool(key: String): Boolean? {
     }
 }
 
+/** 严格布尔（存储字段用）：仅接受 JSON true/false */
+fun JSONObject.optBooleanOrNull(key: String): Boolean? {
+    if (!has(key) || isNull(key)) return null
+    return try {
+        if (get(key) is Boolean) optBoolean(key) else null
+    } catch (e: Exception) {
+        null
+    }
+}
+
 /** 遍历 JSONArray 的下标迭代（空安全） */
 inline fun JSONArray.forEachObj(action: (JSONObject) -> Unit) {
     for (i in 0 until length()) {

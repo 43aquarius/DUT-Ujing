@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { friendlyName } from "@/lib/ujing";
 
 export const runtime = "nodejs";
 
@@ -23,13 +24,14 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
   }
 }
 
-/** PATCH /api/devices/[id]  body: { mobile, name } —— 修改备注名 / 更新状态缓存 */
+/** PATCH /api/devices/[id]  body: { mobile, name?, customName?, lastStatus?, lastReason?, scanInfo? } —— 修改备注名 / 更新状态缓存 */
 export async function PATCH(req: NextRequest, ctx: Ctx) {
   const { id } = await ctx.params;
   try {
     const body = (await req.json()) as {
       mobile?: string;
       name?: string;
+      customName?: boolean;
       lastStatus?: string;
       lastReason?: string | null;
       scanInfo?: {
@@ -45,10 +47,24 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     if (!existing || existing.userMobile !== body.mobile) {
       return NextResponse.json({ error: "设备不存在" }, { status: 404 });
     }
+    // 名称处理：
+    //  - 显式改名 → 用新名并标记 customName（此后不再自动升级）
+    //  - 携带 scanInfo 回填且旧名非自定义 → 升级为友好别名「门店 #机号」
+    const storeName = body.scanInfo?.storeName?.trim() || existing.storeName;
+    const deviceNo = body.scanInfo?.deviceNo?.trim() || existing.deviceNo;
+    let nameData: string | undefined = undefined;
+    let customNameData: boolean | undefined = undefined;
+    if (body.name !== undefined) {
+      nameData = body.name.trim() || existing.name;
+      customNameData = body.customName ?? true;
+    } else if (!existing.customName && storeName && deviceNo) {
+      nameData = friendlyName(storeName, deviceNo) ?? undefined;
+    }
     const device = await db.device.update({
       where: { id },
       data: {
-        name: body.name?.trim() || undefined,
+        name: nameData,
+        customName: customNameData,
         lastStatus: body.lastStatus ?? undefined,
         lastReason: body.lastReason ?? undefined,
         lastCheckedAt:

@@ -26,6 +26,7 @@ data class SavedDevice(
     val storeName: String? = null,
     val deviceTypeId: Int? = null,
     val macAddress: String? = null,
+    val customName: Boolean = false,   // 用户手动改过名 → 不再自动升级为友好名
     // —— 最近一次查询结果（缓存，离线也可见）——
     val lastStatus: String? = null,   // UiStatus.name
     val lastLabel: String? = null,
@@ -45,6 +46,7 @@ data class SavedDevice(
         storeName?.let { put("storeName", it) }
         deviceTypeId?.let { put("deviceTypeId", it) }
         macAddress?.let { put("macAddress", it) }
+        put("customName", customName)
         lastStatus?.let { put("lastStatus", it) }
         lastLabel?.let { put("lastLabel", it) }
         lastDetail?.let { put("lastDetail", it) }
@@ -70,6 +72,7 @@ data class SavedDevice(
                 storeName = o.optStringOrNull("storeName"),
                 deviceTypeId = o.optIntOrNull("deviceTypeId"),
                 macAddress = o.optStringOrNull("macAddress"),
+                customName = o.optBooleanOrNull("customName") ?: false,
                 lastStatus = o.optStringOrNull("lastStatus"),
                 lastLabel = o.optStringOrNull("lastLabel"),
                 lastDetail = o.optStringOrNull("lastDetail"),
@@ -84,12 +87,35 @@ data class SavedDevice(
     }
 }
 
+/** 卡片大字展示名：自定义名优先，否则自动友好名（门店 #机号），降级到备注名 */
+fun SavedDevice.displayName(): String =
+    if (!customName) friendlyName(storeName, deviceNo) ?: name else name
+
+/** 旧版自动名「洗衣机 123456」模式（用于存量数据升级判断） */
+fun SavedDevice.isLegacyAutoName(): Boolean =
+    !customName && name matches Regex("^洗衣机 \\d{1,8}$")
+
+/** 列表排序模式 */
+enum class SortMode(val label: String) {
+    ADDED("添加时间"),
+    NAME("名称"),
+    STATUS("状态（空闲优先）"),
+    REMAIN("剩余时间（快洗完优先）"),
+    ;
+
+    companion object {
+        fun fromName(v: String?): SortMode = entries.firstOrNull { it.name == v } ?: ADDED
+    }
+}
+
 /** 本地存储（SharedPreferences + JSON，与 v1 数据结构对等） */
 object Store {
     private const val PREFS = "dut_ujing_store"
     private const val KEY_SESSION = "session"
     private const val KEY_DEVICES = "devices"
     private const val KEY_AUTO_REFRESH = "auto_refresh"
+    private const val KEY_SORT_MODE = "sort_mode"
+    private const val KEY_FREE_ONLY = "free_only"
 
     private const val SESSION_TTL_MS = 7 * 24 * 3600 * 1000L  // 与 v1 一致：7 天后需重新登录
 
@@ -151,6 +177,22 @@ object Store {
     fun setAutoRefresh(ctx: Context, on: Boolean) {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_AUTO_REFRESH, on).apply()
+    }
+
+    fun sortMode(ctx: Context): SortMode =
+        SortMode.fromName(ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_SORT_MODE, null))
+
+    fun setSortMode(ctx: Context, mode: SortMode) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(KEY_SORT_MODE, mode.name).apply()
+    }
+
+    fun freeOnly(ctx: Context): Boolean =
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_FREE_ONLY, false)
+
+    fun setFreeOnly(ctx: Context, on: Boolean) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_FREE_ONLY, on).apply()
     }
 
     fun newDeviceId(): String = UUID.randomUUID().toString().substring(0, 8)

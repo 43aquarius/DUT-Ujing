@@ -90,7 +90,8 @@ export function ScanDialog({ open, onOpenChange, token, onScanned }: ScanDialogP
             undefined,
         };
         setScanInfo(merged);
-        setName(merged.storeName ? `${merged.storeName} ${merged.deviceNo ?? ""}`.trim() : "");
+        // v2.1：备注名默认留空 → 服务端自动生成友好别名「西山1舍-5层 #3」
+        setName("");
         setPhase("result");
       } catch (e) {
         setPhase("scan");
@@ -322,10 +323,18 @@ export function ScanDialog({ open, onOpenChange, token, onScanned }: ScanDialogP
             <Separator />
 
             <div className="space-y-2">
-              <Label htmlFor="device-name">备注名（保存后可随时查看）</Label>
+              <Label htmlFor="device-name">自定义备注名（可选）</Label>
               <Input
                 id="device-name"
-                placeholder="例如：3楼洗衣房右滚筒"
+                placeholder={
+                  scanInfo.storeName || scanInfo.deviceNo
+                    ? `默认用「${
+                        [scanInfo.storeName, scanInfo.deviceNo ? `#${scanInfo.deviceNo}` : null]
+                          .filter(Boolean)
+                          .join(" ")
+                      }」，可自定义`
+                    : "例如：3楼洗衣房右滚筒"
+                }
                 value={name}
                 maxLength={30}
                 onChange={(e) => setName(e.target.value)}

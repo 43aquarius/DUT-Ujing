@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { isUjingQrCode } from "@/lib/ujing";
+import { friendlyName, isUjingQrCode } from "@/lib/ujing";
 
 export const runtime = "nodejs";
 
@@ -46,6 +46,13 @@ export async function POST(req: NextRequest) {
       update: {},
       create: { mobile },
     });
+    // v2.1：默认名 = 友好别名「西山1舍-5层 #3」，拿不到才降级「洗衣机 159528」
+    const storeName = scanInfo?.storeName?.trim() || null;
+    const deviceNo = scanInfo?.deviceNo?.trim() || null;
+    const autoName =
+      friendlyName(storeName, deviceNo) ??
+      name?.trim() ??
+      `洗衣机 ${code.slice(-6)}`;
     const device = await db.device.upsert({
       where: { userMobile_qrCode: { userMobile: mobile, qrCode: code } },
       update: {
@@ -62,7 +69,7 @@ export async function POST(req: NextRequest) {
       create: {
         userMobile: mobile,
         qrCode: code,
-        name: name?.trim() || `洗衣机 ${code.slice(-6)}`,
+        name: autoName,
         deviceId: scanInfo?.deviceId ? String(scanInfo.deviceId) : null,
         deviceNo: scanInfo?.deviceNo ?? null,
         storeName: scanInfo?.storeName ?? null,

@@ -240,6 +240,28 @@ export function isUjingQrCode(text: string): boolean {
   );
 }
 
+/**
+ * 友好显示名：「西山1舍-5层 #3」这种给人看的名字。
+ * 优先 门店名 + 机号；拿不到时返回 null（调用方自行降级到备注名/机身码尾号）。
+ */
+export function friendlyName(
+  storeName?: string | null,
+  deviceNo?: string | null,
+  fallback?: string | null
+): string | null {
+  const s = storeName?.trim() || null;
+  const n = deviceNo?.trim() || null;
+  if (s && n) return `${s} #${n}`;
+  if (s) return s;
+  if (n) return `机器 #${n}`;
+  return fallback ?? null;
+}
+
+/** 旧版自动名「洗衣机 123456」模式（用于存量数据升级判断） */
+export function isLegacyAutoName(name: string): boolean {
+  return /^洗衣机 \d{1,8}$/.test(name);
+}
+
 export interface OrderDetail {
   orderId?: string | number;
   status?: number | string;
@@ -249,6 +271,40 @@ export interface OrderDetail {
   deviceNo?: string;
   storeName?: string;
   [k: string]: unknown;
+}
+
+export interface RunningOrder {
+  orderId: string | number;
+  deviceId?: string;
+  deviceNo?: string;
+  deviceTypeId?: number | string;
+  deviceTypeName?: string;
+  storeName?: string;
+  status?: number | string;
+  statusRemark?: string;
+  remainTime?: number | string; // 秒
+  workTime?: number | string;   // 分钟
+  isPauseStatus?: boolean | number;
+  createAt?: string;
+  [k: string]: unknown;
+}
+
+/**
+ * 我正在进行的订单（GET /api/v1/orders/running）。
+ * 用于「我的订单」视图 + 给自己正在洗的那台显示权威剩余时间。
+ * 失败返回空数组（静默降级）。
+ */
+export async function runningOrders(token: string): Promise<RunningOrder[]> {
+  try {
+    const json = await request<RunningOrder[]>("GET", "/api/v1/orders/running", businessHeaders(token));
+    const data = json.data as unknown;
+    const arr = Array.isArray(data)
+      ? data
+      : ((data as { orders?: RunningOrder[] } | null)?.orders ?? []);
+    return arr.filter((o) => o && typeof o === "object");
+  } catch {
+    return [];
+  }
 }
 
 /**
